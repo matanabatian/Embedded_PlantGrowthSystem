@@ -1,10 +1,10 @@
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>   // Read the rest of the article
+#include <PubSubClient.h>   
 #include <stdlib.h>
 
 //Wifi Information
-const char *ssid =  "Matan&Keren";   // cannot be longer than 32 characters!
-const char *pass =  "304865215KF";   //
+const char *ssid =  "daizi";   // WiFi username
+const char *pass =  "leon1992";   //WiFi password
 
 //MQTT Information
 #define MQTT_SERVER "m24.cloudmqtt.com"
@@ -15,6 +15,10 @@ const char *pass =  "304865215KF";   //
 WiFiClient wclient;  //Declares a WifiClient Object using ESP8266WiFi
 PubSubClient client(wclient);  //instanciates client object
 
+//Pump variables
+const int relayPin = D7; // Digital pin 7 output for pump
+
+/* Internet related functions */
 //Setting connection to WiFi
 void ConnectToWifi()
 {
@@ -62,13 +66,45 @@ void callback(char* topic, byte *payload, unsigned int length)
     Serial.println();
 }
 
+/* Sensors related functions*/
+//This function returns the soil moistue level in percentage
+int SoilMoistureLevel()
+{
+  int rawDryValue = 1023;
+  int rawWetValue = 340;
+  int percentageDryValue = 0;
+  int percentageWetValue = 100;
+
+  int rawValue = analogRead(A0);
+  int percentageValue = map(rawValue, rawDryValue, rawWetValue, percentageDryValue, percentageWetValue);
+
+  Serial.print(percentageValue);
+  Serial.println("%");
+  
+  return percentageValue;
+}
+
+//This function control the pump 
+bool PumpControl(int desiredSoilMoistureLevel)
+{
+  if(SoilMoistureLevel() < desiredSoilMoistureLevel)
+  {
+    digitalWrite(relayPin, HIGH);
+    for (int count = 0 ; count < 5 ; count++)
+      delay(1000);
+  }
+  else
+    digitalWrite(relayPin, LOW); 
+}
+
 void setup()
 {
   Serial.begin(115200);
   Serial.println();
-  ConnectToWifi();
-  client.setServer(MQTT_SERVER, MQTT_PORT);
-  client.setCallback(callback);
+  ConnectToWifi();//Connecting to wifi
+  client.setServer(MQTT_SERVER, MQTT_PORT);//Setting MQTT server
+  client.setCallback(callback);//Setting the callback function
+  pinMode(relayPin, OUTPUT);//pinMode for Pump
 }
 
 void loop() 
@@ -76,8 +112,16 @@ void loop()
   if (!client.connected()) 
     ConnectToMQTT();
 
+   if(WiFi.status() == WL_CONNECTION_LOST)
+   {
+    Serial.println("WiFi connection lost! Trying to reconnect...");
+    ConnectToWifi();
+   }
+
   //Listener for incoming and outgoing data
   client.loop();
   
-    //client.publish("temp_topic", "Bla Bla Bla", true);
+//client.publish("temp_topic", "Bla Bla Bla", true);
+
+  PumpControl(80);
 }
