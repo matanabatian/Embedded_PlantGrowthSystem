@@ -1,19 +1,25 @@
+using namespace std;
+
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>   
+#include <WiFiClient.h>
+#include <ESP8266HTTPClient.h>
 #include <stdlib.h>
 
+#define NEW_REASEARCH_DELAY 60000
+#define NEW_INTERVALS_DELAY 30000
+#define SEND_SENSORS_SAMPLES_DELAY 10000
+
 //Wifi Information
-const char *ssid =  "daizi";   // WiFi username
-const char *pass =  "leon1992";   //WiFi password
+const char *ssid =  "Matan&Keren";   // WiFi username
+const char *pass =  "304865215KF";   //WiFi password
 
-//MQTT Information
-#define MQTT_SERVER "m24.cloudmqtt.com"
-#define MQTT_USER "fcayusle"
-#define MQTT_PASSWORD "qo3nLLQlEEUz"
-#define MQTT_PORT 16067
+//Last execution time
+unsigned long checkForNewReasearch;
+unsigned long checkForNewIntervals;
+unsigned long sendSensorsSamples;
 
-WiFiClient wclient;  //Declares a WifiClient Object using ESP8266WiFi
-PubSubClient client(wclient);  //instanciates client object
+HTTPClient http;
+WiFiClient client;
 
 //Pump variables
 const int relayPin = D7; // Digital pin 7 output for pump
@@ -32,38 +38,6 @@ void ConnectToWifi()
   Serial.println();
   Serial.print("Connected to WiFi!, IP address: ");
   Serial.println(WiFi.localIP());
-}
-
-void ConnectToMQTT()
-{
-  // Loop until we're reconnected
-  while (!client.connected()) {
-    Serial.println("Attempting MQTT connection...");
-    // Attempt to connect
-    // If you do not want to use a username and password, change next line to
-    // if (client.connect("ESP8266Client")) {
-    if (client.connect("ESP8266Client", MQTT_USER, MQTT_PASSWORD)) {
-      Serial.println("Connected to MQTT server!");
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-  //client.subscribe("Bla");
-}
-
-//Function that holds the received message data
-void callback(char* topic, byte *payload, unsigned int length) 
-{
-    Serial.println("A message has been recieved from server!");
-    Serial.print("Topic:");
-    Serial.println(topic);
-    Serial.print("Data:");  
-    Serial.write(payload, length);
-    Serial.println();
 }
 
 /* Sensors related functions*/
@@ -97,31 +71,109 @@ bool PumpControl(int desiredSoilMoistureLevel)
     digitalWrite(relayPin, LOW); 
 }
 
+String HttpPost(String url, String content)
+{
+    //Specify request destination
+    if(http.begin(url))
+    {
+      http.addHeader("Content-Type", "application/x-www-form-urlencoded");    //Specify content-type header
+      int httpCode = http.POST(content);   //Send the request
+      String payload = http.getString();    //Get the response payload
+      Serial.println(httpCode);   //Print HTTP return code
+      Serial.println(payload);    //Print request response payload
+      http.end();  //Close connection
+    }
+}
+
+String HttpGet(String url)
+{
+  if (http.begin(client, url)) // HTTP
+  {  
+      // start connection and send HTTP header
+      int httpCode = http.GET();
+
+      // httpCode will be negative on error
+      if (httpCode > 0) 
+      {
+        // HTTP header has been send and Server response header has been handled
+        Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+        
+        // file found at server
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
+        {
+          String payload = http.getString();
+          Serial.println(payload);
+          return payload;
+        }
+      } 
+      else 
+      {
+        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+        return http.errorToString(httpCode).c_str();
+      }
+      http.end();
+    } 
+    else 
+    {
+      Serial.printf("[HTTP} Unable to connect\n");
+      return "[HTTP} Unable to connect\n";
+    }
+}
+
+void NewResearch()
+{
+  Serial.println("New research!");
+  //HttpGet("url");
+}
+
+void NewIntervals()
+{
+  Serial.println("New Intervals!");
+  //HttpGet("url");
+}
+
+void SendSensorsSamples()
+{
+  Serial.println("Sensors samples!");
+  //HttpPost("url", "data");
+}
+
+void ExecuteFunction(int delayTime)
+{
+  switch(delayTime)
+  {
+    case 60000: NewResearch();break;
+    case 30000: NewIntervals();break;
+    case 10000: SendSensorsSamples();break;
+  }
+}
+
+unsigned long DelayExecution(unsigned long my_time,int delayTime)
+{
+  if(millis()-my_time > delayTime)     //Has one second passed?
+  {
+    ExecuteFunction(delayTime);
+    return millis();         //and reset time.
+  }
+  return my_time;
+}
+
 void setup()
 {
   Serial.begin(115200);
-  Serial.println();
+  checkForNewReasearch = sendSensorsSamples = checkForNewIntervals = millis();
   ConnectToWifi();//Connecting to wifi
-  client.setServer(MQTT_SERVER, MQTT_PORT);//Setting MQTT server
-  client.setCallback(callback);//Setting the callback function
-  pinMode(relayPin, OUTPUT);//pinMode for Pump
+//  pinMode(relayPin, OUTPUT);//pinMode for Pump
 }
 
 void loop() 
 {
-  if (!client.connected()) 
-    ConnectToMQTT();
-
    if(WiFi.status() == WL_CONNECTION_LOST)
    {
-    Serial.println("WiFi connection lost! Trying to reconnect...");
-    ConnectToWifi();
+      Serial.println("WiFi connection lost! Trying to reconnect...");
+      ConnectToWifi();
    }
-
-  //Listener for incoming and outgoing data
-  client.loop();
-  
-//client.publish("temp_topic", "Bla Bla Bla", true);
-
-  PumpControl(80);
+    checkForNewReasearch = DelayExecution(checkForNewReasearch, NEW_REASEARCH_DELAY);
+    checkForNewIntervals = DelayExecution(checkForNewIntervals, NEW_INTERVALS_DELAY);
+    sendSensorsSamples = DelayExecution(sendSensorsSamples, SEND_SENSORS_SAMPLES_DELAY);
 }
