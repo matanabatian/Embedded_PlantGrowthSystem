@@ -1,33 +1,52 @@
 using namespace std;
 
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
-#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <SimpleTimer.h>
 #include <stdlib.h>
+#include <string> 
 
-#define NEW_REASEARCH_DELAY 60000
-#define NEW_INTERVALS_DELAY 30000
-#define SEND_SENSORS_SAMPLES_DELAY 10000
+//Functions timer
+SimpleTimer functionsTimer;
+
+//Research information
+String researchID = "5c9123439ec5fc4398bfef5b";
+int soilHumidity;
+int temperature;
+int light;
+String dailyIntervals;
 
 //Wifi Information
 const char *ssid =  "Matan&Keren";   // WiFi username
 const char *pass =  "304865215KF";   //WiFi password
 
-//Last execution time
-unsigned long checkForNewReasearch;
-unsigned long checkForNewIntervals;
-unsigned long sendSensorsSamples;
+//Https information
+const char* host = "plantgrowthsystembackend.azurewebsites.net";
+const int httpsPort = 443;
 
-HTTPClient http;
-WiFiClient client;
+// SHA1 fingerprint of the certificate
+const char fingerprint[] PROGMEM = "3ab0b1c27f746fd90c34f0d6a960cf73a4229de8";
 
 //Pump variables
 const int relayPin = D7; // Digital pin 7 output for pump
+
+//Urls for functions
+String sendSamplesURL = "/Plant/UpdateMeasure";
+String newResearchURL = "/Research/GetNewResearchByIp?plantIp=10.12.156.65";
+String newIntervalsURL = "/Plant/GetIntervalsByDate?id=5c9123439ec5fc4398bfef5b";
+
+//Data format sent to the server
+String reasearchSamples = "{'id': '5c9123439ec5fc4398bfef5b' ,'Temp': '23', 'Light': '12','Humidity': '26' }";
+
+// Use WiFiClientSecure class to create TLS connection
+WiFiClientSecure httpsClient;
+
 
 /* Internet related functions */
 //Setting connection to WiFi
 void ConnectToWifi()
 {
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pass);
   Serial.print("Connecting");
   while (WiFi.status() != WL_CONNECTED)
@@ -38,6 +57,71 @@ void ConnectToWifi()
   Serial.println();
   Serial.print("Connected to WiFi!, IP address: ");
   Serial.println(WiFi.localIP());
+}
+
+//HTTPS POST is used to send data to a server to create/update a resource.
+void HttpsPost(String url)
+{  
+  httpsClient.setFingerprint(fingerprint);
+  if (!httpsClient.connect(host, httpsPort))
+  {
+    Serial.println("connection failed");
+    return;
+  }
+
+  httpsClient.print(String("POST ") + url + " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" +
+               "Content-Type: application/json"+ "\r\n" +
+               "Content-Length: "+ String(reasearchSamples.length()) + "\r\n\r\n" +
+               reasearchSamples + "\r\n" +
+               "Connection: close\r\n\r\n");
+
+  Serial.println("request sent");
+  
+   while (httpsClient.connected()) 
+   {
+    String line = httpsClient.readStringUntil('\n');
+    if (line == "\r") {
+      Serial.println("headers received");
+      break;
+    }
+  }
+  
+  while(httpsClient.available())
+  {        
+    String line = httpsClient.readStringUntil('\n');  //Read Line by Line
+    Serial.println(line); //Print response
+  }
+  Serial.println("closing connection");
+}
+
+//HTTPS GET is used to request data from a specified resource.
+String HttpsGet(String url)
+{
+  httpsClient.setFingerprint(fingerprint);
+  if (!httpsClient.connect(host, httpsPort)) 
+  {
+    Serial.println("connection failed");
+    return "Error";
+  }
+
+  httpsClient.print(String("GET ") + url + " HTTP/1.1\r\n" + "Host: " + host + "\r\n" + "User-Agent: BuildFailureDetectorESP8266\r\n" + "Connection: close\r\n\r\n");
+
+  Serial.println("request sent");
+  while (httpsClient.connected()) 
+  {
+    String data = httpsClient.readStringUntil('\n');
+    if (data == "\r") {
+      Serial.println("headers received: ");
+      Serial.println(data);
+      break;
+    }
+  }
+  String data = httpsClient.readStringUntil('\n');
+
+  Serial.println(data);
+  Serial.println("closing connection");
+  return data;
 }
 
 /* Sensors related functions*/
@@ -59,7 +143,7 @@ int SoilMoistureLevel()
 }
 
 //This function control the pump 
-bool PumpControl(int desiredSoilMoistureLevel)
+bool WaterPumpControl(int desiredSoilMoistureLevel)
 {
   if(SoilMoistureLevel() < desiredSoilMoistureLevel)
   {
@@ -71,109 +155,51 @@ bool PumpControl(int desiredSoilMoistureLevel)
     digitalWrite(relayPin, LOW); 
 }
 
-String HttpPost(String url, String content)
+void UpdateSamplesString()
 {
-    //Specify request destination
-    if(http.begin(url))
-    {
-      http.addHeader("Content-Type", "application/x-www-form-urlencoded");    //Specify content-type header
-      int httpCode = http.POST(content);   //Send the request
-      String payload = http.getString();    //Get the response payload
-      Serial.println(httpCode);   //Print HTTP return code
-      Serial.println(payload);    //Print request response payload
-      http.end();  //Close connection
-    }
-}
-
-String HttpGet(String url)
-{
-  if (http.begin(client, url)) // HTTP
-  {  
-      // start connection and send HTTP header
-      int httpCode = http.GET();
-
-      // httpCode will be negative on error
-      if (httpCode > 0) 
-      {
-        // HTTP header has been send and Server response header has been handled
-        Serial.printf("[HTTP] GET... code: %d\n", httpCode);
-        
-        // file found at server
-        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
-        {
-          String payload = http.getString();
-          Serial.println(payload);
-          return payload;
-        }
-      } 
-      else 
-      {
-        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        return http.errorToString(httpCode).c_str();
-      }
-      http.end();
-    } 
-    else 
-    {
-      Serial.printf("[HTTP} Unable to connect\n");
-      return "[HTTP} Unable to connect\n";
-    }
+  reasearchSamples = "{'id': '5c9123439ec5fc4398bfef5b' ,'Temp': '"+String(random(20, 26))+"', 'Light': '"+String(random(0, 101))+"','Humidity': '"+String(random(10, 35))+"' }";
 }
 
 void NewResearch()
 {
+  String tmpID;
   Serial.println("New research!");
-  //HttpGet("url");
+  tmpID = HttpsGet(newResearchURL);
+  if(tmpID != NULL && tmpID != "Error")
+    researchID = tmpID; 
 }
 
 void NewIntervals()
 {
   Serial.println("New Intervals!");
-  //HttpGet("url");
+  dailyIntervals = HttpsGet(newIntervalsURL);
+  Serial.print("Daily Intervals: ");
+  Serial.println(dailyIntervals);
 }
 
 void SendSensorsSamples()
 {
   Serial.println("Sensors samples!");
-  //HttpPost("url", "data");
-}
-
-void ExecuteFunction(int delayTime)
-{
-  switch(delayTime)
-  {
-    case 60000: NewResearch();break;
-    case 30000: NewIntervals();break;
-    case 10000: SendSensorsSamples();break;
-  }
-}
-
-unsigned long DelayExecution(unsigned long my_time,int delayTime)
-{
-  if(millis()-my_time > delayTime)     //Has one second passed?
-  {
-    ExecuteFunction(delayTime);
-    return millis();         //and reset time.
-  }
-  return my_time;
+  //soilHumidity = SoilMoistureLevel();
+  UpdateSamplesString();
+  HttpsPost(sendSamplesURL);
 }
 
 void setup()
 {
   Serial.begin(115200);
-  checkForNewReasearch = sendSensorsSamples = checkForNewIntervals = millis();
   ConnectToWifi();//Connecting to wifi
 //  pinMode(relayPin, OUTPUT);//pinMode for Pump
+  functionsTimer.setInterval(10800000, SendSensorsSamples);
 }
 
 void loop() 
-{
+{ 
    if(WiFi.status() == WL_CONNECTION_LOST)
    {
       Serial.println("WiFi connection lost! Trying to reconnect...");
       ConnectToWifi();
    }
-    checkForNewReasearch = DelayExecution(checkForNewReasearch, NEW_REASEARCH_DELAY);
-    checkForNewIntervals = DelayExecution(checkForNewIntervals, NEW_INTERVALS_DELAY);
-    sendSensorsSamples = DelayExecution(sendSensorsSamples, SEND_SENSORS_SAMPLES_DELAY);
+
+   functionsTimer.run();
 }
