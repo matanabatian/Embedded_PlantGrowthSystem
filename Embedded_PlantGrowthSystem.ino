@@ -202,7 +202,7 @@ void NewResearch()
   tmpID = HttpsGet(newResearchURL);
   if(tmpID != NULL && tmpID != "Error")
     researchID = tmpID; 
-  if(researchID.IsEmpty() == false)
+  if(researchID != NULL)
   {
     IsResearchBegin = true;
     NewIntervals();
