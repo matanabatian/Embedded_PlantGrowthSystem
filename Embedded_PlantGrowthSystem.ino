@@ -16,17 +16,17 @@ int sendSamplesTimerID;
 
 //Research information
 String researchID = "5c9123439ec5fc4398bfef5b";
+//String researchID;
 int freaquencyOfMeasurement;
 int frequencyOfUpload;
 int minHumidity, maxHumidity;
-int minTemperature, maxTemperature;
+float minTemperature, maxTemperature;
 int minLight, maxLight;
-bool IsResearchBegin = false;
 
 //Samples values
-int soilHumidity;
-int temperature;
-int light;
+int currentSoilHumidity;
+int currentTemperature;
+int currentLight;
 String dailyIntervals;
 
 //Wifi Information
@@ -142,7 +142,7 @@ String HttpsGet(String url)
 int SoilMoistureLevel()
 {
   int rawDryValue = 1023;
-  int rawWetValue = 340;
+  int rawWetValue = 230;
   int percentageDryValue = 0;
   int percentageWetValue = 100;
 
@@ -158,19 +158,33 @@ int SoilMoistureLevel()
 //This function control the pump 
 bool WaterPumpControl(int desiredSoilMoistureLevel)
 {
-  if(SoilMoistureLevel() < desiredSoilMoistureLevel)
+  Serial.println(desiredSoilMoistureLevel);
+  while(SoilMoistureLevel() < desiredSoilMoistureLevel)
   {
+    Serial.println("The current soil humidity is lower then the required level. Starting to water the plant...");
     digitalWrite(relayPin, HIGH);
     for (int count = 0 ; count < 5 ; count++)
       delay(1000);
   }
-  else
-    digitalWrite(relayPin, LOW); 
+  Serial.println("The current soil humidity level is the same as the required level. Stopping the water pump...");
+  digitalWrite(relayPin, LOW); 
 }
 
 void UpdateSamplesString()
 {
-  reasearchSamples = "{'id': '5c9123439ec5fc4398bfef5b' ,'Temp': '"+String(random(20, 26))+"', 'Light': '"+String(random(0, 101))+"','Humidity': '"+String(random(10, 35))+"' }";
+  reasearchSamples = "{'id': '5c9123439ec5fc4398bfef5b' ,'Temp': '"+String(random(20, 26))+"', 'Light': '"+String(random(0, 101))+"','Humidity': '"+String(random(25, 30))+"' }";
+}
+
+void PrintResearchIntervals()
+{
+  Serial.println(freaquencyOfMeasurement);
+  Serial.println(frequencyOfUpload);
+  Serial.println(minHumidity);
+  Serial.println(maxHumidity);
+  Serial.println(minTemperature);
+  Serial.println(maxTemperature);
+  Serial.println(minLight);
+  Serial.println(maxLight);
 }
 
 void DisassembleJson(String jsonIntervals)
@@ -185,34 +199,40 @@ void DisassembleJson(String jsonIntervals)
   }
   
   // Fetch values.
-  int freaquencyOfMeasurement = doc["Frequency_of_measurement"];
-  int frequencyOfUpload = doc["Frequency_of_upload"];
-  int minHumidity = doc["Control_plan"]["min_Humidity"];
-  int maxHumidity = doc["Control_plan"]["max_Humidity"];
-  float minTemperature = doc["Control_plan"]["min_Temperature"];
-  float maxTemperature = doc["Control_plan"]["max_Temperature"];
-  int minLight = doc["Control_plan"]["min_Light"];
-  int maxLight = doc["Control_plan"]["max_Light"];
+  freaquencyOfMeasurement = doc["Frequency_of_measurement"];
+  frequencyOfUpload = doc["Frequency_of_upload"];
+  minHumidity = doc["Control_plan"]["min_Humidity"];
+  maxHumidity = doc["Control_plan"]["max_Humidity"];
+  minTemperature = doc["Control_plan"]["min_Temperature"];
+  maxTemperature = doc["Control_plan"]["max_Temperature"];
+  minLight = doc["Control_plan"]["min_Light"];
+  maxLight = doc["Control_plan"]["max_Light"];
+
+  PrintResearchIntervals();
 }
 
 void NewResearch()
 {
-  String tmpID;
-  Serial.println("New research!");
-  tmpID = HttpsGet(newResearchURL);
-  if(tmpID != NULL && tmpID != "Error")
-    researchID = tmpID; 
-  if(researchID != NULL)
+  //researchID = HttpsGet(newResearchURL);
+  if(researchID != NULL && researchID != "Error")
   {
-    IsResearchBegin = true;
+    Serial.println("New research Found!");
     NewIntervals();
     functionsTimer.disable(newResearchTimerID); //Disable newResearch function timer
-  }   
+  }
+  else
+    Serial.println("There is no new research!");
 }
 
 void NewIntervals()
 {
-  Serial.println("New Intervals!");
+  //Delete old timers
+  if(newIntervalsTimerID != NULL && sendSamplesTimerID != NULL)
+  {
+    functionsTimer.disable(newIntervalsTimerID);
+    functionsTimer.disable(sendSamplesTimerID);
+  }
+  
   dailyIntervals = HttpsGet(newIntervalsURL);
   DisassembleJson(dailyIntervals);
   newIntervalsTimerID = functionsTimer.setInterval(freaquencyOfMeasurement * 3600000, NewIntervals); //Get research intervals every freaquencyOfMeasurement hours
@@ -221,7 +241,6 @@ void NewIntervals()
 
 void SendSensorsSamples()
 {
-  Serial.println("Sensors samples!");
   //WaterPumpControl(minHumidity);
   UpdateSamplesString();
   HttpsPost(sendSamplesURL);
@@ -231,8 +250,8 @@ void setup()
 {
   Serial.begin(115200);
   ConnectToWifi();//Connecting to wifi
-//  pinMode(relayPin, OUTPUT);//pinMode for Pump
-  newResearchTimerID = functionsTimer.setInterval(600000, NewResearch);// Search for new research every 10 min
+  //pinMode(relayPin, OUTPUT);//pinMode for Pump
+  newResearchTimerID = functionsTimer.setInterval(60000, NewResearch);// Search for new research every 10 min
 }
 
 void loop() 
@@ -242,5 +261,6 @@ void loop()
       Serial.println("WiFi connection lost! Trying to reconnect...");
       ConnectToWifi();
    }
+   
    functionsTimer.run();
 }
