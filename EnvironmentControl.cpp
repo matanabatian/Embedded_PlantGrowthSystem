@@ -24,8 +24,8 @@ int EnvironmentControl::SoilMoistureLevel()
 {
   byte soilMoistureMuxChannel = 0;
   mux.setChannel(soilMoistureMuxChannel);
-  int rawDryValue = 1023;
-  int rawWetValue = 230;
+  int rawDryValue = 1024;
+  int rawWetValue = 260;
   int percentageDryValue = 0;
   int percentageWetValue = 100;
 
@@ -41,20 +41,26 @@ int EnvironmentControl::SoilMoistureLevel()
   return percentageValue;
 }
 
-void EnvironmentControl::WaterPumpControl(int desiredSoilMoistureLevel)
+void EnvironmentControl::WaterPumpControl(int minHumidity, int maxHumidity)
 {
-  Serial.println(desiredSoilMoistureLevel);
-  while(SoilMoistureLevel() < desiredSoilMoistureLevel)
+  //Serial.println(SoilMoistureLevel());
+  if(SoilMoistureLevel() <= minHumidity)
   {
-    Serial.println("The current soil humidity is lower then the required level. Starting to water the plant...");
-    digitalWrite(relayPinPump, HIGH);
-    for (int count = 0 ; count < 5 ; count++){
-      pumpWorkingTimerCounter++;
-      delay(1000);
-    }    
+    while(SoilMoistureLevel() <= (minHumidity+maxHumidity)/2)
+    {
+      Serial.println("The current soil humidity is lower then the required level. Starting to water the plant...");
+      digitalWrite(relayPinPump, HIGH);
+      for (int count = 0 ; count < 7 ; count++){
+        pumpWorkingTimerCounter++;
+        delay(1000);
+      } 
+  
+      /* Turn off pump and delay execution of code for more accurate measurement of soil moisture */
+      digitalWrite(relayPinPump, LOW);
+      delay(3000);    
+    }
   }
-  Serial.println("The current soil humidity level is the same as the required level. Stopping the water pump...");
-  digitalWrite(relayPinPump, LOW); 
+  Serial.println("The current soil humidity level reached the required level. Stopping the water pump...");
 }
 
 int EnvironmentControl::UvLightLevel()
@@ -87,19 +93,19 @@ int EnvironmentControl::UvLightLevel()
 
 }
 
-bool uvLightToggleFlg = false;
+bool uvLightToggleFlg = true;
 
 void EnvironmentControl::UvLightControl(int hoursOfLightCycle)
 {
-  if(uvLightToggleFlg == false)
+  if(uvLightToggleFlg == true)
   {
     digitalWrite(relayPinUV, HIGH);
     sumOfUvLightWorkingTime += hoursOfLightCycle;
-    uvLightToggleFlg = true;
+    uvLightToggleFlg = false;
   }
   else
   {
     digitalWrite(relayPinUV, LOW);
-    uvLightToggleFlg = false;
+    uvLightToggleFlg = true;
   }
 }

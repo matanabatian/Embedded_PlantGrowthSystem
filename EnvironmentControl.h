@@ -13,7 +13,7 @@ class EnvironmentControl
 	  EnvironmentControl();
     /* Soil moisture measure & water pump methods */
 	  int SoilMoistureLevel();
-	  void WaterPumpControl(int desiredSoilMoistureLevel);
+	  void WaterPumpControl(int minHumidity, int maxHumidity);
 
     /* UV light measure & UV light bulb methods */
     int UvLightLevel();

@@ -6,6 +6,7 @@
 const char *ssid =  "Matan&Keren";   // WiFi username
 const char *pass =  "304865215KF";   //WiFi password
 
+
 WifiConnection::WifiConnection(){}
 
 void WifiConnection::ConnectToWifi()

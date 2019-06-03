@@ -44,7 +44,7 @@ String ServerGetPost::httpsGet(String url)
 //HTTPS POST is used to send data to a server to create/update a resource.
 void ServerGetPost::httpsPost(String url, String reasearchSamples)
 {
-  httpsClient.setFingerprint(fingerprint);
+  httpsClient.setFingerprint (fingerprint );
   if (!httpsClient.connect(host, httpsPort))
   {
     Serial.println("connection failed");
