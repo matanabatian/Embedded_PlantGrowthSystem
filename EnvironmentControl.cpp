@@ -18,6 +18,9 @@ EnvironmentControl::EnvironmentControl()
   
   pinMode(relayPinPump, OUTPUT);// pinMode for Pump
   pinMode(relayPinUV, OUTPUT);// pinMode for UV light
+
+  currentSoilHumidity = -1;
+  currentUvLight = -1;
 }
 
 int EnvironmentControl::SoilMoistureLevel()
@@ -50,7 +53,7 @@ void EnvironmentControl::WaterPumpControl(int minHumidity, int maxHumidity)
     {
       Serial.println("The current soil humidity is lower then the required level. Starting to water the plant...");
       digitalWrite(relayPinPump, HIGH);
-      for (int count = 0 ; count < 7 ; count++){
+      for (int count = 0 ; count < 3 ; count++){
         pumpWorkingTimerCounter++;
         delay(1000);
       } 

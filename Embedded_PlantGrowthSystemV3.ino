@@ -14,6 +14,7 @@ SimpleTimer mainTimer;
 
 //Timers IDs
 int newResearchTimerID;
+int newIntervalsID;
 int MeasureGrowthEnvironmentID;
 int SendDataToServerID;
 int StartUvLightCycleID;
@@ -25,7 +26,6 @@ int freaquencyOfMeasurement;
 int frequencyOfUpload;
 int minHumidity, maxHumidity;
 int hoursOfLightCycle;
-
 
 // Daily values for the research
 String dailyIntervals;
@@ -43,17 +43,6 @@ EnvironmentControl environmentControl = EnvironmentControl();
 // Create GET & POST instance
 ServerGetPost serverGetPost = ServerGetPost();
 
-// Removes the apostrophes from researchID string
-String removeApostrophesFromString(String line)
-{
-  String tmpStr;
-  for(int i = 1; i < line.length()-1; ++i)
-  {
-    tmpStr += line[i];
-  }
-  return tmpStr;
-}
-
 // This function calculates the total power consumption per frequencyOfUpload
 double CalculateTotalPowerConsumption()
 {
@@ -70,7 +59,7 @@ double CalculateTotalPowerConsumption()
 void UpdateSamplesString()
 {
   double powerConsumption = CalculateTotalPowerConsumption();
-  double waterConsumption = 0.0000075 * (double)environmentControl.pumpWorkingTimerCounter;
+  double waterConsumption = 0.0075 * (double)environmentControl.pumpWorkingTimerCounter;
   researchSamples = "{'id': '"+researchID+"', 'Light': '"+String(environmentControl.currentUvLight)+"', 'Humidity': '"+String(environmentControl.currentSoilHumidity)+"', 'WaterAmount': '"+String(waterConsumption, 10)+"', 'PowerConsumption': '"+String(powerConsumption)+"'  }";
 }
 
@@ -96,7 +85,7 @@ void StopResearch()
 void DisassembleJson(String jsonIntervals)
 {
   Serial.println(jsonIntervals);
-  StaticJsonDocument<320> doc;
+  StaticJsonDocument<500> doc;
   DeserializationError error = deserializeJson(doc,jsonIntervals);
   // Test if parsing succeeds.
   if (error) {
@@ -110,19 +99,46 @@ void DisassembleJson(String jsonIntervals)
   frequencyOfUpload = doc["Frequency_of_upload"];
   minHumidity = doc["Control_plan"]["min_Humidity"];
   maxHumidity = doc["Control_plan"]["max_Humidity"];
-  hoursOfLightCycle = doc["Control_plan"]["light_Per_Day"];
+  hoursOfLightCycle = doc["Control_plan"]["light_cycle"];
   PrintResearchIntervals();
 }
 
-void NewResearch()
+String CheckSystemIntegrity()
 {
-  researchID = serverGetPost.httpsGet(serverGetPost.newResearchURL);
-  researchID = removeApostrophesFromString(researchID);
+  environmentControl.SoilMoistureLevel();
+  environmentControl.UvLightLevel();
+  if(environmentControl.currentSoilHumidity != -1 && environmentControl.currentUvLight != -1)
+    return "Ok";
+  else
+    return "Error";
+}
+
+void LoopUntilSystemIsFixed()
+{
+  while(true)
+  {
+    if(CheckSystemIntegrity() == "Ok")
+    {
+      serverGetPost.httpsGet(serverGetPost.systemIsWorkingURL + researchID + "&status=Ok");
+      return;
+    } 
+    delay(5000);
+  }
+}
+
+void NewResearch()
+{ 
+  String systemCheckResult = CheckSystemIntegrity();
+  researchID = serverGetPost.httpsGet(serverGetPost.newResearchURL + systemCheckResult);
+  if(systemCheckResult == "Error")
+    LoopUntilSystemIsFixed();
+    
   if(researchID != NULL && researchID != "Error")
   {
     Serial.println("New research Found!");
     NewIntervals();
-    mainTimer.setInterval(24 * 3600000, NewIntervals);
+    newIntervalsID = mainTimer.setInterval(24 * 3600000, NewIntervals);
+    StartWaterPumpID = mainTimer.setInterval(900000, StartWaterPump); // Starting water pump every 15 minutes(only if the current soil moisture is less then the required minimum soil moisture)
     mainTimer.disable(newResearchTimerID); //Disable newResearch function timer
   }
   else
@@ -132,10 +148,11 @@ void NewResearch()
 void NewIntervals()
 {
   //Delete old timers
-  if(MeasureGrowthEnvironmentID != NULL && SendDataToServerID != NULL)
+  if(MeasureGrowthEnvironmentID != NULL && SendDataToServerID != NULL && StartUvLightCycleID != NULL)
   {
     mainTimer.disable(MeasureGrowthEnvironmentID);
     mainTimer.disable(SendDataToServerID);
+    mainTimer.disable(StartUvLightCycleID);
   }
 
   dailyIntervals = serverGetPost.httpsGet(serverGetPost.newIntervalsURL + researchID);
@@ -143,7 +160,6 @@ void NewIntervals()
   MeasureGrowthEnvironmentID = mainTimer.setInterval(freaquencyOfMeasurement * 3600000, MeasureGrowthEnvironment); //Measure growth environment every freaquencyOfMeasurement hours
   SendDataToServerID = mainTimer.setInterval(frequencyOfUpload * 3600000, SendDataToServer); //Send research samples every frequencyOfUpload hours
   StartUvLightCycleID = mainTimer.setInterval(hoursOfLightCycle * 3600000, StartUvLightCycle); // Starting UV light cycle
-  StartWaterPumpID = mainTimer.setInterval(900000, StartWaterPump); // Starting water pump every 15 minutes(only if the current soil moisture is less then the required minimum soil moisture)
 }
 
 void MeasureGrowthEnvironment()
@@ -186,6 +202,6 @@ void loop()
       Serial.println("WiFi connection lost! Trying to reconnect...");
       wifi.ConnectToWifi();
    }
-   
+
    mainTimer.run();
 }
