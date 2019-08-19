@@ -91,9 +91,7 @@ int EnvironmentControl::UvLightLevel()
   if (Vsig > 795 && Vsig < 881) {Serial.print("UV Index: 8 ");currentUvLight = 8;mux.disable();return 8;}
   if (Vsig > 881 && Vsig < 976) {Serial.print("UV Index: 9 ");currentUvLight = 9;mux.disable();return 9;}
   if (Vsig > 976 && Vsig < 1079) {Serial.print("UV Index: 10 ");currentUvLight = 10;mux.disable();return 10;}
-  if (Vsig > 1079 && Vsig < 1170) {Serial.print("UV Index: 11 ");currentUvLight = 11;mux.disable();return 11;}
-  if (Vsig > 1170) {Serial.print("UV Index: 11+ ");currentUvLight = 12;mux.disable();return 12;}
-
+  if (Vsig > 1079) {Serial.print("UV Index: 11+ ");currentUvLight = 11;mux.disable();return 11;}
 }
 
 bool uvLightToggleFlg = true;

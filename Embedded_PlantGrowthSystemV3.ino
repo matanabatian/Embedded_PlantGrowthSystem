@@ -48,10 +48,10 @@ double CalculateTotalPowerConsumption()
 {
   // Calulcate pump power consumption
   double pumpWorkingTimeInHours = environmentControl.pumpWorkingTimerCounter / 3600;
-  double pumpPowerConsumption = pumpWorkingTimeInHours * 0.4;
+  double pumpPowerConsumption = pumpWorkingTimeInHours * 0.005;
 
   // Calculate UV bulb power consumption
-  double uvBulbPowerConsumption = environmentControl.sumOfUvLightWorkingTime * 0.024; // (Volts x Amps)=  Volts x Amps= Watts DC units,then / by 1000 for kilowatt - (5 x 0.480) / 1000  =  0.0024
+  double uvBulbPowerConsumption = environmentControl.sumOfUvLightWorkingTime * 0.0024; // (Volts x Amps)=  Volts x Amps= Watts DC units,then / by 1000 for kilowatt - (5 x 0.480) / 1000  =  0.0024
   // Return total power consumption
   return pumpPowerConsumption + uvBulbPowerConsumption;
 }
