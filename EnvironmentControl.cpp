@@ -3,6 +3,7 @@
 //Relay variables
 const int relayPinPump = D2; // Digital pin 7 output for pump in order to toggle HIGH / LOW
 const int relayPinUV = D1; // Digital pin 1 output for UV light in order to toggle HIGH / LOW
+const int waterPumpDelayTime = 2; // The time it takes for the water to reach the plant
 
 // Creates a MUX74HC4067 instance
 // 1st argument is the Arduino PIN to which the EN pin connects
@@ -53,11 +54,12 @@ void EnvironmentControl::WaterPumpControl(int minHumidity, int maxHumidity)
     {
       Serial.println("The current soil humidity is lower then the required level. Starting to water the plant...");
       digitalWrite(relayPinPump, HIGH);
-      for (int count = 0 ; count < 3 ; count++){
+      for (int count = 0 ; count < 5 ; count++){
         pumpWorkingTimerCounter++;
         delay(1000);
       } 
-  
+
+      pumpWorkingTimerCounter - waterPumpDelayTime;
       /* Turn off pump and delay execution of code for more accurate measurement of soil moisture */
       digitalWrite(relayPinPump, LOW);
       delay(3000);    
