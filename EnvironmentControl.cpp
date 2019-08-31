@@ -76,7 +76,7 @@ void EnvironmentControl::WaterPumpControl(int minHumidity, int maxHumidity)
         delay(1000);
       } 
 
-      pumpWorkingTimerCounter - waterPumpDelayTime;
+      pumpWorkingTimerCounter -= waterPumpDelayTime;
       /* Turn off pump and delay execution of code for more accurate measurement of soil moisture */
       digitalWrite(relayPinPump, LOW);
       delay(3000);    
