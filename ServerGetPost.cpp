@@ -10,16 +10,23 @@ const char fingerprint[] PROGMEM = "3ab0b1c27f746fd90c34f0d6a960cf73a4229de8";
 const char* host = "plantgrowthsystembackend.azurewebsites.net";
 const int httpsPort = 443;
 
+/* Instantiates a ServerGetPost class*/
 ServerGetPost::ServerGetPost(){}
 
-//HTTPS GET is used to request data from a specified resource.
+/*!
+ * @brief: HTTPS GET is used to request data from a specified resource.
+ * @param: url 
+ *         url path get data from
+ * @return:data
+ *         data string
+ */
 String ServerGetPost::httpsGet(String url)
 {
   httpsClient.setFingerprint(fingerprint);
   if (!httpsClient.connect(host, httpsPort)) 
   {
     Serial.println("connection failed");
-    return "Error";
+    return "Error at httpsClient connection";
   }
   
   httpsClient.print(String("GET ") + url + " HTTP/1.1\r\n" + "Host: " + host + "\r\n" + "User-Agent: BuildFailureDetectorESP8266\r\n" + "Connection: close\r\n\r\n");
@@ -41,7 +48,14 @@ String ServerGetPost::httpsGet(String url)
   return data;
 }
 
-//HTTPS POST is used to send data to a server to create/update a resource.
+/*!
+ * @brief: HTTPS POST is used to send data to a server to create/update a resource.
+ * @param: url
+ *         url path send data to
+ * @param:reasearchSamples
+ *        data to send
+ * @return:
+ */
 void ServerGetPost::httpsPost(String url, String reasearchSamples)
 {
   httpsClient.setFingerprint (fingerprint );

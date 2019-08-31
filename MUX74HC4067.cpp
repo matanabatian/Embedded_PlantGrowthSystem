@@ -57,28 +57,41 @@ void MUX74HC4067::setChannel(int8_t pin, uint8_t set)
 	if ( set == ENABLED ) digitalWrite(enable_pin, LOW);
 }
 
-// Enables the connection of the SIG pin with a channel that was set earlier
+/*!
+ * @brief: Enables the connection of the SIG pin with a channel that was set earlier
+ * @param: 
+ * @return:
+ */
 void MUX74HC4067::enable()
 {
 	enable_status = ENABLED;
 	digitalWrite(enable_pin, LOW);
 }
 
-// Disables the connection of the SIG pin with a channel that was set earlier
+/*!
+ * @brief: Disables the connection of the SIG pin with a channel that was set earlier
+ * @param: 
+ * @return:
+ */
 void MUX74HC4067::disable()
 {
 	enable_status = DISABLED;
 	digitalWrite(enable_pin, HIGH);
 }
 
-// Configures the signal pin. If set to input, it reads from the signal pin.
-// If set to output, it writes to the signal pin. If set to digital, it reads or writes
-// a digital value to the signal pin. If set to analog, either it reads an analog value 
-// from the signal pin, or it writes a PWM output to the signal pin.
-// Arguments:
-// sig - Arduino pin to which the SIG pin connects
-// mode - either INPUT or OUTPUT or INPUT_PULLUP
-// type - either DIGITAL or ANALOG
+/*!
+ * @brief: Configures the signal pin. If set to input, it reads from the signal pin.
+ * If set to output, it writes to the signal pin. If set to digital, it reads or write 
+ * a digital value to the signal pin. If set to analog, either it reads an analog value 
+ * from the signal pin, or it writes a PWM output to the signal pin.
+ * 
+ * @param: uint8_t
+ *         sig - Arduino pin to which the SIG pin connects 
+ *         mode - either INPUT or OUTPUT or INPUT_PULLUP 
+ *         type - either DIGITAL or ANALOG
+ *      
+ * @return:
+ */
 void MUX74HC4067::signalPin(uint8_t sig, uint8_t mode, uint8_t type)
 {
 	signal_pin = sig;
@@ -95,14 +108,21 @@ void MUX74HC4067::signalPin(uint8_t sig, uint8_t mode, uint8_t type)
 	else if (type == DIGITAL ) signal_pin_status = 1;
 }
 
-// It reads from the configured or requested channel
-// If the signal pin was set to DIGITAL, it returns HIGH or LOW
-// If the signal pin was set to ANALOG, it returns the value read by the A/D converter
-// It the signal pin was not set earlier, it returns -1
-// There is an optional arguments for changing momentarily the channel from which to read
-// This doesn't change the earlier configuration. e.g. If channel 7 was selected and its 
-// connection was disabled, after reading the requested channel the configuration will 
-// return to channel 7 disabled.
+/*!
+ * @brief: It reads from the configured or requested channel
+ * If the signal pin was set to DIGITAL, it returns HIGH or LOW 
+ * If the signal pin was set to ANALOG, it returns the value read by the A/D converter 
+ * It the signal pin was not set earlier, it returns -1 
+ * There is an optional arguments for changing momentarily the channel from which to read 
+ * This doesn't change the earlier configuration. e.g. If channel 7 was selected and its  
+ * connection was disabled, after reading the requested channel the configuration will  
+ * return to channel 7 disabled.
+ * 
+ * @param: int8_t
+ *         chan_pin-configured or requested channel
+ * @return: int16_t
+ *          data- analog/digital data
+ */
 int16_t MUX74HC4067::read(int8_t chan_pin)
 {
 	uint8_t last_channel;
@@ -119,16 +139,23 @@ int16_t MUX74HC4067::read(int8_t chan_pin)
 	return data;
 }
 
-// It writes to the requested channel. If the signal pin was set to DIGITAL, it writes HIGH or LOW.
-// If the signal pin was set to ANALOG, it writes a PWM output. There is an option to override the
-// ANALOG/DIGITAL configuration of the signal pin.
-// chan_pin - Channel to which to write
-// data - Data to write to channel chan_pin. If the signal pin was set to digital or DIGITAL was
-//        specified in the argument list, data should be HIGH or LOW. If the signal pin was set 
-//        to analog or ANALOG was specified in the argument list, data should the duty cylce of
-//        the PWM output.
-// type - An optional argument that is either ANALOG or DIGITAL, and overrides the ANALOG/DIGITAL
-//        configuration of the signal pin
+
+/*!
+ * @brief:  It writes to the requested channel. If the signal pin was set to DIGITAL, it writes HIGH or LOW. 
+ * If the signal pin was set to ANALOG, it writes a PWM output. There is an option to override the
+ * ANALOG/DIGITAL configuration of the signal pin.
+ * 
+ * @param: chan_pin
+ *         Channel to which to write.
+ * @param: type        
+ *         An optional argument that is either ANALOG or DIGITAL, and overrides the ANALOG/DIGITAL configuration of the signal pin.             
+ * @param: data        
+ *         Data to write to channel chan_pin. If the signal pin was set to digital or DIGITAL was        
+ *         specified in the argument list, data should be HIGH or LOW. If the signal pin was set         
+ *         to analog or ANALOG was specified in the argument list, data should the duty cylce of        
+ *         the PWM output.
+ * @return:
+ */
 uint8_t MUX74HC4067::write(int8_t chan_pin, uint8_t data, int8_t type)
 {
 	if ( signal_mode == INPUT || signal_mode == INPUT_PULLUP ) return -1;
@@ -144,6 +171,5 @@ uint8_t MUX74HC4067::write(int8_t chan_pin, uint8_t data, int8_t type)
 	}
 
 	setChannel(chan_pin);
-
 	return 0;
 }

@@ -4,11 +4,16 @@
 //const char *ssid =  "Shenkar-New";   // WiFi username
 //const char *pass =  "Shenkarwifi";   //WiFi password
 const char *ssid =  "Matan&Keren";   // WiFi username
-const char *pass =  "304865215KF";   //WiFi password
+const char *pass =  "**********";   //WiFi password
 
-
+/* Instantiates a WifiConnection class*/
 WifiConnection::WifiConnection(){}
 
+/*!
+ * @brief:Connect to Wifi
+ * @param: 
+ * @return:
+ */
 void WifiConnection::ConnectToWifi()
 {
     WiFi.mode(WIFI_STA);

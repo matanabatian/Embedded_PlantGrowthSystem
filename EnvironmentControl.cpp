@@ -1,15 +1,18 @@
 #include "EnvironmentControl.h"
 
-//Relay variables
-const int relayPinPump = D2; // Digital pin 7 output for pump in order to toggle HIGH / LOW
-const int relayPinUV = D1; // Digital pin 1 output for UV light in order to toggle HIGH / LOW
-const int waterPumpDelayTime = 2; // The time it takes for the water to reach the plant
+/* Relay variables */
+const int relayPinPump = D2; // Digital pin 7 output for pump in order to toggle HIGH / LOW.
+const int relayPinUV = D1; // Digital pin 1 output for UV light in order to toggle HIGH / LOW.
+const int waterPumpDelayTime = 2; // The time it takes for the water to reach the plant.
+bool uvLightToggleFlg = true;
 
-// Creates a MUX74HC4067 instance
-// 1st argument is the Arduino PIN to which the EN pin connects
-// 2nd-5th arguments are the Arduino PINs to which the S0-S3 pins connect
+/* Creates a MUX74HC4067 instance
+ 1st argument is the Arduino PIN to which the EN pin connects
+ 2nd-5th arguments are the Arduino PINs to which the S0-S3 pins connect
+*/
 MUX74HC4067 mux(D3, D0);
 
+/* Instantiates a EnvironmentControl class*/
 EnvironmentControl::EnvironmentControl()
 {
   // Configures how the SIG pin will be interfaced
@@ -24,6 +27,13 @@ EnvironmentControl::EnvironmentControl()
   currentUvLight = -1;
 }
 
+/*!
+ * @brief: set soil moisture level in precentage(map) 
+ * @param: 
+ * @return:percentageValue
+ *         soil moisture level in precentage.
+ *          
+ */
 int EnvironmentControl::SoilMoistureLevel()
 {
   byte soilMoistureMuxChannel = 0;
@@ -45,6 +55,13 @@ int EnvironmentControl::SoilMoistureLevel()
   return percentageValue;
 }
 
+/*!
+ * @brief: func responsible for balancing the moisture level in the soil
+ * @param: minHumidity - min bound for moistuer level(interval)
+ * @param: maxHumidity - max bound for moistuer level(interval)     
+ *        
+ * @return:
+ */
 void EnvironmentControl::WaterPumpControl(int minHumidity, int maxHumidity)
 {
   //Serial.println(SoilMoistureLevel());
@@ -68,6 +85,12 @@ void EnvironmentControl::WaterPumpControl(int minHumidity, int maxHumidity)
   Serial.println("The current soil humidity level reached the required level. Stopping the water pump...");
 }
 
+/*!
+ * @brief:get UV light sensor level (0~11)
+ * @param: 
+ * @return:0~11
+ *         UV light level
+ */
 int EnvironmentControl::UvLightLevel()
 {
   byte uvLightMuxChannel = 1;
@@ -96,8 +119,13 @@ int EnvironmentControl::UvLightLevel()
   if (Vsig > 1079) {Serial.print("UV Index: 11+ ");currentUvLight = 11;mux.disable();return 11;}
 }
 
-bool uvLightToggleFlg = true;
 
+/*!
+ * @brief: control the UV lite cycle lamp by hoursOfLightCycle interval
+ * @param:hoursOfLightCycle 
+ *        interval.       
+ * @return:
+ */
 void EnvironmentControl::UvLightControl(int hoursOfLightCycle)
 {
   if(uvLightToggleFlg == true)

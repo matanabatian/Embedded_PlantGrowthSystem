@@ -9,41 +9,48 @@ using namespace std;
 #include "EnvironmentControl.h"
 #include "ServerGetPost.h"
 
-//Functions timer
+/* Functions timer */
 SimpleTimer mainTimer;
 
-//Timers IDs
-int newResearchTimerID;
+/* Timers IDs */
+int newResearchTimerID; 
 int newIntervalsID;
 int MeasureGrowthEnvironmentID;
 int SendDataToServerID;
 int StartUvLightCycleID;
 int StartWaterPumpID;
 
-//Research information
+/* Research information */
 String researchID;
 int freaquencyOfMeasurement;
 int frequencyOfUpload;
 int minHumidity, maxHumidity;
 int hoursOfLightCycle;
 
-// Daily values for the research
-String dailyIntervals;
+/* Daily values for the research */
+String dailyIntervals; //jason
 
-// Samples values
+/* Samples values */
 String researchSamples = "{'id': '5c9123439ec5fc4398bfef5b','Light': '12', 'Humidity': '26', 'WaterAmount': '15', 'PowerConsumption': '25.2342'}";
 
-
-// Create wifi instance
+/* Create wifi instance */
 WifiConnection wifi = WifiConnection(); 
 
-// Create environment control instance
+/* Create environment control instance */
 EnvironmentControl environmentControl = EnvironmentControl();
 
-// Create GET & POST instance
+/* Create GET & POST instance */
 ServerGetPost serverGetPost = ServerGetPost();
+/*-----------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
-// This function calculates the total power consumption per frequencyOfUpload
+/*!
+ * @brief: This function calculates the total power consumption per frequencyOfUpload
+ * @param:
+ * @return: pumpPowerConsumption               
+ *          water pump power consumption total value.
+ * @return: uvBulbPowerConsumption      
+ *          UV bulb power consumption total value.
+ */
 double CalculateTotalPowerConsumption()
 {
   // Calulcate pump power consumption
@@ -56,6 +63,11 @@ double CalculateTotalPowerConsumption()
   return pumpPowerConsumption + uvBulbPowerConsumption;
 }
 
+/*!
+ * @brief: update strings that send to DB
+ * @param: 
+ * @return:
+ */
 void UpdateSamplesString()
 {
   double powerConsumption = CalculateTotalPowerConsumption();
@@ -63,6 +75,11 @@ void UpdateSamplesString()
   researchSamples = "{'id': '"+researchID+"', 'Light': '"+String(environmentControl.currentUvLight)+"', 'Humidity': '"+String(environmentControl.currentSoilHumidity)+"', 'WaterAmount': '"+String(waterConsumption, 10)+"', 'PowerConsumption': '"+String(powerConsumption)+"'  }";
 }
 
+/*!
+ * @brief: Printing method for check
+ * @param: 
+ * @return:
+ */
 void PrintResearchIntervals()
 {
   Serial.println(freaquencyOfMeasurement);
@@ -72,6 +89,13 @@ void PrintResearchIntervals()
   Serial.println(hoursOfLightCycle);
 }
 
+/*!
+ * @brief: stop all research timers and set research timer 
+ *         to look for new research every 10 min.
+ * 
+ * @param: 
+ * @return:
+ */
 void StopResearch()
 {
   mainTimer.disable(MeasureGrowthEnvironmentID);
@@ -82,12 +106,17 @@ void StopResearch()
   newResearchTimerID = mainTimer.setInterval(10000, NewResearch); // Search for new research every 10 min 
 }
 
+/*!
+ * @brief: Disassemble Json file data with research intervals and fetch values
+ * @param: jsonIntervals
+ *         Json file
+ * @return:
+ */
 void DisassembleJson(String jsonIntervals)
 {
   Serial.println(jsonIntervals);
-  StaticJsonDocument<500> doc;
-  DeserializationError error = deserializeJson(doc,jsonIntervals);
-  // Test if parsing succeeds.
+  StaticJsonDocument<500> doc; //allocation
+  DeserializationError error = deserializeJson(doc,jsonIntervals); // Test if parsing succeeds.
   if (error) {
     Serial.print(F("deserializeJson() failed with code "));
     Serial.println(error.c_str());
@@ -103,6 +132,12 @@ void DisassembleJson(String jsonIntervals)
   PrintResearchIntervals();
 }
 
+/*!
+ * @brief: sensors check before research.
+ * @param: 
+ * @return: "Ok" - soil or uv sensors are not good to go
+ * @return: "Eror" - soil and uv sensors are good to go
+ */
 String CheckSystemIntegrity()
 {
   environmentControl.SoilMoistureLevel();
@@ -113,6 +148,11 @@ String CheckSystemIntegrity()
     return "Error";
 }
 
+/*!
+ * @brief:Keep running in loop until sensors will be fixed.
+ * @param: 
+ * @return:
+ */
 void LoopUntilSystemIsFixed()
 {
   while(true)
@@ -126,18 +166,23 @@ void LoopUntilSystemIsFixed()
   }
 }
 
+/*!
+ * @brief: sensors check + find new research + set research timers.
+ * @param: 
+ * @return:
+ */
 void NewResearch()
 { 
-  String systemCheckResult = CheckSystemIntegrity();
-  researchID = serverGetPost.httpsGet(serverGetPost.newResearchURL + systemCheckResult);
+  String systemCheckResult = CheckSystemIntegrity(); //sensors check
+  researchID = serverGetPost.httpsGet(serverGetPost.newResearchURL + systemCheckResult); //geting research ID
   if(systemCheckResult == "Error")
     LoopUntilSystemIsFixed();
     
   if(researchID != NULL && researchID != "Error")
   {
     Serial.println("New research Found!");
-    NewIntervals();
-    newIntervalsID = mainTimer.setInterval(24 * 3600000, NewIntervals);
+    NewIntervals(); //set all timers by intervals
+    newIntervalsID = mainTimer.setInterval(24 * 3600000, NewIntervals);// update all intervals any 24 hours
     StartWaterPumpID = mainTimer.setInterval(900000, StartWaterPump); // Starting water pump every 15 minutes(only if the current soil moisture is less then the required minimum soil moisture)
     mainTimer.disable(newResearchTimerID); //Disable newResearch function timer
   }
@@ -145,55 +190,92 @@ void NewResearch()
     Serial.println("There is no new research!");
 }
 
+/*!
+ * @brief: get new interval, set all research timers by the new json interval demand ("dailyIntervals").
+ * @param: 
+ * @return:
+ */
 void NewIntervals()
 {
-  //Delete old timers
-  if(MeasureGrowthEnvironmentID != NULL && SendDataToServerID != NULL && StartUvLightCycleID != NULL)
+  if(MeasureGrowthEnvironmentID != NULL && SendDataToServerID != NULL && StartUvLightCycleID != NULL) //If there was research before the current one
   {
     mainTimer.disable(MeasureGrowthEnvironmentID);
     mainTimer.disable(SendDataToServerID);
     mainTimer.disable(StartUvLightCycleID);
   }
 
-  dailyIntervals = serverGetPost.httpsGet(serverGetPost.newIntervalsURL + researchID);
-  DisassembleJson(dailyIntervals);
+  dailyIntervals = serverGetPost.httpsGet(serverGetPost.newIntervalsURL + researchID);//geting json file
+  DisassembleJson(dailyIntervals); // disassemble jason
+  
+  /*set timers */
   MeasureGrowthEnvironmentID = mainTimer.setInterval(freaquencyOfMeasurement * 3600000, MeasureGrowthEnvironment); //Measure growth environment every freaquencyOfMeasurement hours
   SendDataToServerID = mainTimer.setInterval(frequencyOfUpload * 3600000, SendDataToServer); //Send research samples every frequencyOfUpload hours
   StartUvLightCycleID = mainTimer.setInterval(hoursOfLightCycle * 3600000, StartUvLightCycle); // Starting UV light cycle
 }
 
+/*!
+ * @brief: Measure growth environment.
+ * @param: 
+ * @return:
+ */
 void MeasureGrowthEnvironment()
 {
   environmentControl.SoilMoistureLevel();
   environmentControl.UvLightLevel();
 }
 
+/*!
+ * @brief:send research samples to server 
+ * @param: 
+ * @return:
+ */
 void SendDataToServer()
 {
-  UpdateSamplesString();
-  serverGetPost.httpsPost(serverGetPost.sendSamplesURL, researchSamples);
-  environmentControl.pumpWorkingTimerCounter = 0; // Reset pump timer to 0
-  environmentControl.sumOfUvLightWorkingTime = 0; // Reset UV light working time in current cycle
+  UpdateSamplesString(); //update strings that send to DB
+  serverGetPost.httpsPost(serverGetPost.sendSamplesURL, researchSamples); //send research samples
+  environmentControl.pumpWorkingTimerCounter = 0; // Reset pump timer to 0 for new calc value
+  environmentControl.sumOfUvLightWorkingTime = 0; // Reset UV light working time in current cycle for new calc value
 }
 
+/*!
+ * @brief:
+ * @param: 
+ * @return:
+ */
 void StartWaterPump()
 {
   environmentControl.WaterPumpControl(minHumidity,maxHumidity);
 }
 
+/*!
+ * @brief:
+ * @param: 
+ * @return:
+ */
 void StartUvLightCycle()
 {
   environmentControl.UvLightControl(hoursOfLightCycle);
 }
 
+/*!
+ * @brief: function is called when a sketch starts. 
+ * Use it to initialize,function will only run once, after each powerup or reset of the Arduino board.
+ * 
+ * @param: 
+ * @return:
+ */
 void setup()
 {
-  Serial.begin(115200);
-  
+  Serial.begin(115200); // opens serial port, sets data rate to 115200 bps
   wifi.ConnectToWifi();//Connecting to wifi
-  newResearchTimerID = mainTimer.setInterval(10000, NewResearch); // Search for new research every 10 min 
+  newResearchTimerID = mainTimer.setInterval(600000, NewResearch); // Search for new research every 10 min 
 }
 
+/*!
+ * @brief: loops consecutively.
+ * @param: 
+ * @return:
+ */
 void loop() 
 { 
    // Reconnect if wifi connection is lost
